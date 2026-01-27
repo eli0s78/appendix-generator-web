@@ -47,6 +47,7 @@ export interface ExtractionInfo {
 export interface ProjectData {
   version: string;
   savedAt: string;
+  apiKey: string | null;
   fileName: string | null;
   bookContent: string | null;
   extractionInfo: ExtractionInfo | null;
@@ -213,6 +214,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     return {
       version: '1.0',
       savedAt: new Date().toISOString(),
+      apiKey,
       fileName,
       bookContent,
       extractionInfo,
@@ -222,10 +224,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       wordCountOption,
       currentStep,
     };
-  }, [fileName, bookContent, extractionInfo, planningData, generatedAppendices, forecastYears, wordCountOption, currentStep]);
+  }, [apiKey, fileName, bookContent, extractionInfo, planningData, generatedAppendices, forecastYears, wordCountOption, currentStep]);
 
   // Load project data
   const loadProjectData = useCallback((data: ProjectData) => {
+    // Restore API key if saved
+    if (data.apiKey) {
+      setApiKey(data.apiKey);
+      // Note: apiKeyValid will need to be re-validated by the user
+      // The key is pre-filled so they just need to click Validate
+    }
     setFileName(data.fileName);
     setBookContent(data.bookContent);
     setExtractionInfo(data.extractionInfo);

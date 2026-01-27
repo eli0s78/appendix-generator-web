@@ -19,13 +19,18 @@ import {
   HelpCircle,
   Info,
   ExternalLink,
-  Menu,
-  X,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 type PendingAction = 'new' | 'load' | null;
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onToggle: () => void;
+}
+
+export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const {
     hasProjectData,
     hasUnsavedChanges,
@@ -38,7 +43,6 @@ export function Sidebar() {
     apiKeyValid,
   } = useAppState();
 
-  const [isOpen, setIsOpen] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -50,11 +54,9 @@ export function Sidebar() {
       setPendingAction('new');
       setShowConfirmDialog(true);
     } else if (hasProjectData()) {
-      // Has data but saved - still confirm
       setPendingAction('new');
       setShowConfirmDialog(true);
     } else {
-      // No data, just reset
       resetAll();
     }
   };
@@ -94,7 +96,6 @@ export function Sidebar() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Reset input so same file can be selected again
     e.target.value = '';
 
     if (hasUnsavedChanges() && pendingAction !== 'load') {
@@ -119,7 +120,6 @@ export function Sidebar() {
       }
 
       loadProjectData(data);
-      setIsOpen(false);
     } catch {
       alert('Failed to load project file. Please check the file format.');
     }
@@ -160,47 +160,31 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Hamburger Button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed top-4 left-4 z-40 p-2 bg-white rounded-lg shadow-md border hover:bg-gray-50 transition-colors"
-        aria-label="Open menu"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
-
-      {/* Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/20 z-40"
-          onClick={() => setIsOpen(false)}
-        />
-      )}
-
-      {/* Sidebar Panel */}
-      <div
-        className={`fixed top-0 left-0 h-full w-72 bg-white shadow-xl z-50 transform transition-transform duration-200 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+      {/* Sidebar Panel - Fixed position, no overlay */}
+      <aside
+        className={`fixed top-0 left-0 h-full bg-gray-50 border-r shadow-sm z-30 transition-all duration-200 flex flex-col ${
+          isOpen ? 'w-64' : 'w-0'
         }`}
+        style={{ overflow: 'hidden' }}
       >
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full w-64">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center justify-between p-4 border-b bg-white">
             <span className="font-semibold text-gray-700">File</span>
             <button
-              onClick={() => setIsOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded"
-              aria-label="Close menu"
+              onClick={onToggle}
+              className="p-1 hover:bg-gray-100 rounded text-gray-500"
+              aria-label="Collapse sidebar"
             >
-              <X className="w-5 h-5" />
+              <ChevronLeft className="w-5 h-5" />
             </button>
           </div>
 
           {/* File Actions */}
-          <div className="p-4 space-y-2">
+          <div className="p-3 space-y-1">
             <Button
-              variant="outline"
-              className="w-full justify-start"
+              variant="ghost"
+              className="w-full justify-start h-9 px-3"
               onClick={handleNewProject}
             >
               <FilePlus className="w-4 h-4 mr-2" />
@@ -208,8 +192,8 @@ export function Sidebar() {
             </Button>
 
             <Button
-              variant="outline"
-              className="w-full justify-start"
+              variant="ghost"
+              className="w-full justify-start h-9 px-3"
               onClick={handleSaveProject}
               disabled={!hasProjectData()}
             >
@@ -218,8 +202,8 @@ export function Sidebar() {
             </Button>
 
             <Button
-              variant="outline"
-              className="w-full justify-start"
+              variant="ghost"
+              className="w-full justify-start h-9 px-3"
               onClick={handleLoadClick}
             >
               <FolderOpen className="w-4 h-4 mr-2" />
@@ -235,70 +219,64 @@ export function Sidebar() {
             />
           </div>
 
-          <div className="border-t mx-4" />
+          <div className="border-t mx-3" />
 
           {/* Help & About */}
-          <div className="p-4 flex-1">
-            <Accordion type="single" collapsible>
-              <AccordionItem value="help">
-                <AccordionTrigger className="text-sm">
+          <div className="p-3 flex-1 overflow-y-auto">
+            <Accordion type="single" collapsible className="space-y-1">
+              <AccordionItem value="help" className="border-none">
+                <AccordionTrigger className="text-sm py-2 px-3 hover:bg-gray-100 rounded hover:no-underline">
                   <span className="flex items-center gap-2">
                     <HelpCircle className="w-4 h-4" />
                     Quick Help
                   </span>
                 </AccordionTrigger>
-                <AccordionContent>
-                  <div className="text-sm text-muted-foreground space-y-2">
+                <AccordionContent className="px-3 pb-2">
+                  <div className="text-xs text-muted-foreground space-y-2">
                     <p className="font-medium">Workflow:</p>
-                    <ol className="list-decimal list-inside space-y-1 ml-2">
+                    <ol className="list-decimal list-inside space-y-1 ml-1">
                       <li>
-                        <strong>API Setup</strong> - Get free key from{' '}
+                        <strong>API Setup</strong> - Get key from{' '}
                         <a
                           href="https://aistudio.google.com/apikey"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                          className="text-blue-600 hover:underline inline-flex items-center gap-0.5"
                         >
                           Google AI Studio
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       </li>
                       <li>
-                        <strong>Upload Book</strong> - Upload PDF and extract content
+                        <strong>Upload Book</strong> - PDF extraction
                       </li>
                       <li>
-                        <strong>Analyze</strong> - AI creates planning table
+                        <strong>Analyze</strong> - AI planning table
                       </li>
                       <li>
-                        <strong>Generate</strong> - Create appendices for chapters
+                        <strong>Generate</strong> - Create appendices
                       </li>
                     </ol>
                   </div>
                 </AccordionContent>
               </AccordionItem>
 
-              <AccordionItem value="about">
-                <AccordionTrigger className="text-sm">
+              <AccordionItem value="about" className="border-none">
+                <AccordionTrigger className="text-sm py-2 px-3 hover:bg-gray-100 rounded hover:no-underline">
                   <span className="flex items-center gap-2">
                     <Info className="w-4 h-4" />
                     About
                   </span>
                 </AccordionTrigger>
-                <AccordionContent>
-                  <div className="text-sm text-muted-foreground space-y-2">
+                <AccordionContent className="px-3 pb-2">
+                  <div className="text-xs text-muted-foreground space-y-1">
                     <p className="font-medium">Appendix Generator v2.0</p>
                     <hr className="my-2" />
-                    <p>
-                      <strong>Creator:</strong> Elias Pierrakos
-                    </p>
-                    <p>
-                      <strong>Organization:</strong> eLearning EKPA
-                    </p>
-                    <p>
-                      <strong>Scientific Supervisor:</strong> Panagiotis Petrakis
-                    </p>
+                    <p><strong>Creator:</strong> Elias Pierrakos</p>
+                    <p><strong>Organization:</strong> eLearning EKPA</p>
+                    <p><strong>Supervisor:</strong> Panagiotis Petrakis</p>
                     <hr className="my-2" />
-                    <p className="italic">Made with Google Antigravity</p>
+                    <p className="italic text-[10px]">Made with Google Antigravity</p>
                   </div>
                 </AccordionContent>
               </AccordionItem>
@@ -307,12 +285,27 @@ export function Sidebar() {
 
           {/* Model Info */}
           {apiKeyValid && (
-            <div className="p-4 border-t text-xs text-muted-foreground">
+            <div className="p-3 border-t text-xs text-muted-foreground bg-white">
               Tier: {detectedTier === 'paid' ? 'Paid' : 'Free'}
             </div>
           )}
         </div>
-      </div>
+      </aside>
+
+      {/* Toggle Button - Always visible */}
+      <button
+        onClick={onToggle}
+        className={`fixed top-4 z-40 p-2 bg-white rounded-r-lg shadow-md border border-l-0 hover:bg-gray-50 transition-all duration-200 ${
+          isOpen ? 'left-64' : 'left-0 rounded-lg border-l'
+        }`}
+        aria-label={isOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+      >
+        {isOpen ? (
+          <ChevronLeft className="w-4 h-4" />
+        ) : (
+          <ChevronRight className="w-4 h-4" />
+        )}
+      </button>
 
       {/* Confirmation Dialog */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>

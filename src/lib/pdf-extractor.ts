@@ -201,7 +201,7 @@ function detectAndRemoveIndex(content: string): {
  */
 function truncateContentSmart(
   content: string,
-  maxChars: number = 1000000
+  maxChars: number = 2500000
 ): { text: string; wasTruncated: boolean; keptPercentage: number } {
   if (content.length <= maxChars) {
     return { text: content, wasTruncated: false, keptPercentage: 100 };

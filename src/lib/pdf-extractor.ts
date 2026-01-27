@@ -115,9 +115,13 @@ function detectAndRemoveBibliography(content: string): {
   const originalLength = content.length;
 
   const bibPatterns = [
-    /\[Page \d+\]\s*\n?\s*(References|Bibliography|Works Cited|Literature Cited|Sources|Cited Works|Reference List|Works Referenced)\s*\n/gi,
-    /\n\s*(References|Bibliography|Works Cited|Literature Cited|Cited Works|Reference List)\s*\n/gi,
+    // English patterns
+    /\[Page \d+\]\s*\n?\s*(References|Bibliography|Works Cited|Literature Cited|Sources|Cited Works|Reference List|Works Referenced|Notes and References|Endnotes|Notes)\s*\n/gi,
+    /\n\s*(References|Bibliography|Works Cited|Literature Cited|Cited Works|Reference List|Notes and References)\s*\n/gi,
     /\n\s*(?:Chapter\s+)?\d*\.?\s*(References|Bibliography)\s*\n/gi,
+    // Greek patterns
+    /\[Page \d+\]\s*\n?\s*(Βιβλιογραφία|Αναφορές|Πηγές|Βιβλιογραφικές Αναφορές|ΒΙΒΛΙΟΓΡΑΦΙΑ|ΑΝΑΦΟΡΕΣ)\s*\n/gi,
+    /\n\s*(Βιβλιογραφία|Αναφορές|Πηγές|Βιβλιογραφικές Αναφορές|ΒΙΒΛΙΟΓΡΑΦΙΑ|ΑΝΑΦΟΡΕΣ)\s*\n/gi,
   ];
 
   let bibStart: number | null = null;
@@ -167,8 +171,12 @@ function detectAndRemoveIndex(content: string): {
   const originalLength = content.length;
 
   const indexPatterns = [
-    /\[Page \d+\]\s*\n?\s*(Subject Index|Author Index|Index|Name Index|General Index)\s*\n/gi,
-    /\n\s*(Subject Index|Author Index|Index|Name Index|General Index)\s*\n/gi,
+    // English patterns
+    /\[Page \d+\]\s*\n?\s*(Subject Index|Author Index|Index|Name Index|General Index|Keyword Index)\s*\n/gi,
+    /\n\s*(Subject Index|Author Index|Index|Name Index|General Index|Keyword Index)\s*\n/gi,
+    // Greek patterns
+    /\[Page \d+\]\s*\n?\s*(Ευρετήριο|Αλφαβητικό Ευρετήριο|Ευρετήριο Όρων|ΕΥΡΕΤΗΡΙΟ)\s*\n/gi,
+    /\n\s*(Ευρετήριο|Αλφαβητικό Ευρετήριο|Ευρετήριο Όρων|ΕΥΡΕΤΗΡΙΟ)\s*\n/gi,
   ];
 
   let indexStart: number | null = null;

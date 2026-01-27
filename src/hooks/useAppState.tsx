@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 
 // Types
 export interface BookOverview {
@@ -44,6 +44,19 @@ export interface ExtractionInfo {
   keptPercentage: number;
 }
 
+export interface ProjectData {
+  version: string;
+  savedAt: string;
+  fileName: string | null;
+  bookContent: string | null;
+  extractionInfo: ExtractionInfo | null;
+  planningData: PlanningData | null;
+  generatedAppendices: Record<string, string>;
+  forecastYears: number;
+  wordCountOption: string;
+  currentStep: number;
+}
+
 export interface AppState {
   // Step tracking
   currentStep: number;
@@ -85,6 +98,13 @@ export interface AppState {
   // Utility
   resetAll: () => void;
   canProceedToStep: (step: number) => boolean;
+
+  // Project management
+  hasProjectData: () => boolean;
+  hasUnsavedChanges: () => boolean;
+  markAsSaved: () => void;
+  getProjectData: () => ProjectData;
+  loadProjectData: (data: ProjectData) => void;
 }
 
 const AppStateContext = createContext<AppState | undefined>(undefined);
@@ -114,6 +134,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [forecastYears, setForecastYears] = useState(15);
   const [wordCountOption, setWordCountOption] = useState('2500-3500');
 
+  // Track saved state for unsaved changes detection
+  const lastSavedStateRef = useRef<string | null>(null);
+
   const addGeneratedAppendix = useCallback((groupId: string, content: string) => {
     setGeneratedAppendices(prev => ({
       ...prev,
@@ -134,6 +157,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setGeneratedAppendices({});
     setForecastYears(15);
     setWordCountOption('2500-3500');
+    lastSavedStateRef.current = null;
   }, []);
 
   const canProceedToStep = useCallback((step: number): boolean => {
@@ -150,6 +174,79 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return false;
     }
   }, [apiKeyValid, bookContent, planningData]);
+
+  // Check if there's any project data
+  const hasProjectData = useCallback((): boolean => {
+    return (
+      bookContent !== null ||
+      planningData !== null ||
+      Object.keys(generatedAppendices).length > 0
+    );
+  }, [bookContent, planningData, generatedAppendices]);
+
+  // Get current state snapshot for comparison
+  const getStateSnapshot = useCallback((): string => {
+    return JSON.stringify({
+      fileName,
+      bookContent: bookContent?.substring(0, 100), // Just use first 100 chars for comparison
+      planningData,
+      generatedAppendices,
+      forecastYears,
+      wordCountOption,
+    });
+  }, [fileName, bookContent, planningData, generatedAppendices, forecastYears, wordCountOption]);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = useCallback((): boolean => {
+    if (!hasProjectData()) return false;
+    if (lastSavedStateRef.current === null) return true;
+    return getStateSnapshot() !== lastSavedStateRef.current;
+  }, [hasProjectData, getStateSnapshot]);
+
+  // Mark current state as saved
+  const markAsSaved = useCallback(() => {
+    lastSavedStateRef.current = getStateSnapshot();
+  }, [getStateSnapshot]);
+
+  // Get project data for saving
+  const getProjectData = useCallback((): ProjectData => {
+    return {
+      version: '1.0',
+      savedAt: new Date().toISOString(),
+      fileName,
+      bookContent,
+      extractionInfo,
+      planningData,
+      generatedAppendices,
+      forecastYears,
+      wordCountOption,
+      currentStep,
+    };
+  }, [fileName, bookContent, extractionInfo, planningData, generatedAppendices, forecastYears, wordCountOption, currentStep]);
+
+  // Load project data
+  const loadProjectData = useCallback((data: ProjectData) => {
+    setFileName(data.fileName);
+    setBookContent(data.bookContent);
+    setExtractionInfo(data.extractionInfo);
+    setPlanningData(data.planningData);
+    setGeneratedAppendices(data.generatedAppendices || {});
+    setForecastYears(data.forecastYears || 15);
+    setWordCountOption(data.wordCountOption || '2500-3500');
+    // Go to step 1 to validate API key first, then user can navigate
+    setCurrentStep(1);
+    // Mark as saved since we just loaded
+    setTimeout(() => {
+      lastSavedStateRef.current = JSON.stringify({
+        fileName: data.fileName,
+        bookContent: data.bookContent?.substring(0, 100),
+        planningData: data.planningData,
+        generatedAppendices: data.generatedAppendices || {},
+        forecastYears: data.forecastYears || 15,
+        wordCountOption: data.wordCountOption || '2500-3500',
+      });
+    }, 0);
+  }, []);
 
   const value: AppState = {
     currentStep,
@@ -179,6 +276,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     setWordCountOption,
     resetAll,
     canProceedToStep,
+    hasProjectData,
+    hasUnsavedChanges,
+    markAsSaved,
+    getProjectData,
+    loadProjectData,
   };
 
   return (

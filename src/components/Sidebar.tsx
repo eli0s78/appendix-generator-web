@@ -169,15 +169,8 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       >
         <div className="flex flex-col h-full w-64">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b bg-white">
+          <div className="flex items-center p-4 border-b bg-white">
             <span className="font-semibold text-gray-700">File</span>
-            <button
-              onClick={onToggle}
-              className="p-1 hover:bg-gray-100 rounded text-gray-500"
-              aria-label="Collapse sidebar"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
           </div>
 
           {/* File Actions */}

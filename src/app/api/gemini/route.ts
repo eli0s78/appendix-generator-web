@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
             generationConfig: {
               temperature: 0.7,
-              maxOutputTokens: 16384,
+              maxOutputTokens: 32768,
             },
           });
 
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
                 contents: [{ role: 'user', parts: [{ text: prompt }] }],
                 generationConfig: {
                   temperature: 0.7,
-                  maxOutputTokens: 16384,
+                  maxOutputTokens: 32768,
                 },
               });
 

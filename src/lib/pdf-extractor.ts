@@ -38,8 +38,8 @@ export async function extractTextFromPdf(
   // Dynamically import PDF.js only on the client side
   const pdfjsLib = await import('pdfjs-dist');
 
-  // Set up the worker
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+  // Set up the worker - use local copy instead of CDN to avoid CORS issues
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
   const arrayBuffer = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;

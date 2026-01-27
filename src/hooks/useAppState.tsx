@@ -176,14 +176,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [apiKeyValid, bookContent, planningData]);
 
-  // Check if there's any project data
+  // Check if there's any project data worth saving
   const hasProjectData = useCallback((): boolean => {
     return (
+      apiKeyValid ||
       bookContent !== null ||
       planningData !== null ||
       Object.keys(generatedAppendices).length > 0
     );
-  }, [bookContent, planningData, generatedAppendices]);
+  }, [apiKeyValid, bookContent, planningData, generatedAppendices]);
 
   // Get current state snapshot for comparison
   const getStateSnapshot = useCallback((): string => {

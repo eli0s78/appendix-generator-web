@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Key, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Loader2, Key, ExternalLink, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 
 export function ApiSetup() {
   const {
@@ -23,6 +23,7 @@ export function ApiSetup() {
   } = useAppState();
 
   const [inputKey, setInputKey] = useState(apiKey || '');
+  const [showKey, setShowKey] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -77,14 +78,24 @@ export function ApiSetup() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex gap-2">
-            <Input
-              type="password"
-              placeholder="Enter your API key (starts with AIza...)"
-              value={inputKey}
-              onChange={(e) => setInputKey(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
-              className="flex-1"
-            />
+            <div className="relative flex-1">
+              <Input
+                type={showKey ? 'text' : 'password'}
+                placeholder="Enter your API key (starts with AIza...)"
+                value={inputKey}
+                onChange={(e) => setInputKey(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleValidate()}
+                className="pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={showKey ? 'Hide API key' : 'Show API key'}
+              >
+                {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
             <Button onClick={handleValidate} disabled={isValidating || !inputKey.trim()}>
               {isValidating ? (
                 <>

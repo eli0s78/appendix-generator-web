@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppState } from '@/hooks/useAppState';
 import { validateApiKey } from '@/lib/gemini-client';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,13 @@ export function ApiSetup() {
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Sync inputKey when apiKey changes (e.g., when loading a project)
+  useEffect(() => {
+    if (apiKey && apiKey !== inputKey) {
+      setInputKey(apiKey);
+    }
+  }, [apiKey]);
 
   const handleValidate = async () => {
     if (!inputKey.trim()) {

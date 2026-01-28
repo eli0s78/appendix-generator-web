@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, X } from 'lucide-react';
 
 interface LoadingOverlayProps {
   isOpen: boolean;
   message: string;
   subMessage?: string;
+  onCancel?: () => void;
 }
 
-export function LoadingOverlay({ isOpen, message, subMessage }: LoadingOverlayProps) {
+export function LoadingOverlay({ isOpen, message, subMessage, onCancel }: LoadingOverlayProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
@@ -45,6 +47,16 @@ export function LoadingOverlay({ isOpen, message, subMessage }: LoadingOverlayPr
               Elapsed: {formatTime(elapsedSeconds)}
             </p>
           </div>
+          {onCancel && (
+            <Button
+              variant="outline"
+              onClick={onCancel}
+              className="mt-2"
+            >
+              <X className="w-4 h-4 mr-2" />
+              Cancel
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

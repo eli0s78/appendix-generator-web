@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAppState, PlanningData, ChapterGroup } from '@/hooks/useAppState';
 import { callGemini, parseJsonResponse, getWorkingModel } from '@/lib/gemini-client';
 import { getAnalysisPrompt } from '@/lib/prompts';
@@ -50,8 +50,15 @@ export function AnalyzeReview() {
   const [changeRequest, setChangeRequest] = useState('');
   const [isApplyingChanges, setIsApplyingChanges] = useState(false);
 
+  // AbortController refs for cancellation
+  const analyzeAbortRef = useRef<AbortController | null>(null);
+  const applyChangesAbortRef = useRef<AbortController | null>(null);
+
   const handleAnalyze = async () => {
     if (!apiKey || !bookContent) return;
+
+    // Create new AbortController for this request
+    analyzeAbortRef.current = new AbortController();
 
     setIsAnalyzing(true);
     setError(null);
@@ -60,18 +67,27 @@ export function AnalyzeReview() {
       const model = getWorkingModel(detectedTier);
       const wasTruncated = extractionInfo?.wasTruncated ?? false;
       const prompt = getAnalysisPrompt(bookContent, wasTruncated);
-      const response = await callGemini(apiKey, prompt, model);
+      const response = await callGemini(apiKey, prompt, model, analyzeAbortRef.current.signal);
       const data = parseJsonResponse(response) as PlanningData;
       setPlanningData(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analysis failed');
+      // Don't show error if it was cancelled
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Cancelled by user - do nothing, keep existing data
+      } else {
+        setError(err instanceof Error ? err.message : 'Analysis failed');
+      }
     } finally {
       setIsAnalyzing(false);
+      analyzeAbortRef.current = null;
     }
   };
 
   const handleApplyChanges = async () => {
     if (!apiKey || !planningData || !changeRequest.trim()) return;
+
+    // Create new AbortController for this request
+    applyChangesAbortRef.current = new AbortController();
 
     setIsApplyingChanges(true);
     setError(null);
@@ -89,14 +105,32 @@ ${changeRequest}
 Apply the requested changes and return the UPDATED planning table as a JSON object with the same structure.
 Return ONLY the JSON object, no additional text.`;
 
-      const response = await callGemini(apiKey, prompt, model);
+      const response = await callGemini(apiKey, prompt, model, applyChangesAbortRef.current.signal);
       const updatedData = parseJsonResponse(response) as PlanningData;
       setPlanningData(updatedData);
       setChangeRequest('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to apply changes');
+      // Don't show error if it was cancelled
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Cancelled by user - do nothing, keep existing data
+      } else {
+        setError(err instanceof Error ? err.message : 'Failed to apply changes');
+      }
     } finally {
       setIsApplyingChanges(false);
+      applyChangesAbortRef.current = null;
+    }
+  };
+
+  const handleCancelAnalyze = () => {
+    if (analyzeAbortRef.current) {
+      analyzeAbortRef.current.abort();
+    }
+  };
+
+  const handleCancelApplyChanges = () => {
+    if (applyChangesAbortRef.current) {
+      applyChangesAbortRef.current.abort();
     }
   };
 
@@ -131,11 +165,13 @@ Return ONLY the JSON object, no additional text.`;
         isOpen={isAnalyzing}
         message="Analyzing Book Structure"
         subMessage="AI is reading and mapping all chapters..."
+        onCancel={handleCancelAnalyze}
       />
       <LoadingOverlay
         isOpen={isApplyingChanges}
         message="Applying Changes"
         subMessage="AI is updating the planning table..."
+        onCancel={handleCancelApplyChanges}
       />
 
       {/* Analysis Card */}

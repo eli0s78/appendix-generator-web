@@ -23,11 +23,13 @@ interface ValidationResponse {
 
 /**
  * Call Gemini API via our serverless proxy
+ * @param signal - Optional AbortSignal for cancellation
  */
 export async function callGemini(
   apiKey: string,
   prompt: string,
-  model?: string
+  model?: string,
+  signal?: AbortSignal
 ): Promise<string> {
   const response = await fetch('/api/gemini', {
     method: 'POST',
@@ -40,6 +42,7 @@ export async function callGemini(
       model,
       action: 'generate',
     }),
+    signal,
   });
 
   const data: GeminiResponse = await response.json();

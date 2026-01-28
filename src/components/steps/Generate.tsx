@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAppState, ChapterGroup } from '@/hooks/useAppState';
 import { callGemini, getWorkingModel } from '@/lib/gemini-client';
 import { getGenerationPrompt } from '@/lib/prompts';
@@ -41,8 +41,14 @@ export function Generate() {
   const [isGenerating, setIsGenerating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // AbortController ref for cancellation
+  const generateAbortRef = useRef<AbortController | null>(null);
+
   const handleGenerate = async (group: ChapterGroup) => {
     if (!apiKey || !bookContent || !planningData) return;
+
+    // Create new AbortController for this request
+    generateAbortRef.current = new AbortController();
 
     setIsGenerating(group.group_id);
     setError(null);
@@ -78,12 +84,24 @@ ${group.foresight_task}`;
         forecastYears
       );
 
-      const response = await callGemini(apiKey, prompt, model);
+      const response = await callGemini(apiKey, prompt, model, generateAbortRef.current.signal);
       addGeneratedAppendix(group.group_id, response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Generation failed');
+      // Don't show error if it was cancelled
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Cancelled by user - do nothing, keep existing data
+      } else {
+        setError(err instanceof Error ? err.message : 'Generation failed');
+      }
     } finally {
       setIsGenerating(null);
+      generateAbortRef.current = null;
+    }
+  };
+
+  const handleCancelGenerate = () => {
+    if (generateAbortRef.current) {
+      generateAbortRef.current.abort();
     }
   };
 
@@ -131,6 +149,7 @@ ${group.foresight_task}`;
         isOpen={isGenerating !== null}
         message="Generating Appendix"
         subMessage={`Creating foresight analysis for ${isGenerating}...`}
+        onCancel={handleCancelGenerate}
       />
 
       {/* Progress Overview */}

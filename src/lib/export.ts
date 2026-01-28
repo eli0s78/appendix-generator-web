@@ -5,6 +5,8 @@
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 /**
  * Export content as Markdown file
@@ -430,113 +432,191 @@ export async function exportPlanningTableToDocx(planningData: PlanningDataExport
 }
 
 /**
- * Export planning table as PDF (opens print dialog)
+ * Export planning table as PDF (direct download)
  */
 export function exportPlanningTableToPdf(planningData: PlanningDataExport): void {
-  // Create HTML content for PDF
-  const html = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Foresight Planning Table: ${escapeHtml(planningData.book_overview.title)}</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px;
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 20;
+  const contentWidth = pageWidth - margin * 2;
+  let yPos = 20;
+
+  // Colors
+  const primaryColor: [number, number, number] = [74, 74, 138]; // #4a4a8a
+  const darkColor: [number, number, number] = [26, 26, 46]; // #1a1a2e
+  const grayColor: [number, number, number] = [100, 100, 100];
+
+  // Helper to check page break
+  const checkPageBreak = (neededHeight: number) => {
+    if (yPos + neededHeight > doc.internal.pageSize.getHeight() - 20) {
+      doc.addPage();
+      yPos = 20;
     }
-    h1 { color: #1a1a2e; border-bottom: 2px solid #4a4a8a; padding-bottom: 10px; }
-    h2 { color: #2d2d5a; margin-top: 30px; }
-    h3 { color: #4a4a8a; margin-top: 25px; }
-    .overview-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-    .overview-table td { padding: 8px 12px; border: 1px solid #ddd; }
-    .overview-table td:first-child { font-weight: bold; background: #f5f5f5; width: 25%; }
-    .group-section { border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 20px 0; background: #fafafa; }
-    .badge { display: inline-block; background: #4a4a8a; color: white; padding: 3px 10px; border-radius: 4px; font-size: 0.85em; margin-right: 8px; }
-    .badge-secondary { background: #666; }
-    .quadrant-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
-    .quadrant-list li { background: #e8e8f0; padding: 4px 12px; border-radius: 4px; font-size: 0.9em; }
-    .label { font-weight: 600; color: #555; margin-bottom: 5px; }
-    .task-content { background: white; padding: 15px; border-radius: 4px; border: 1px solid #e0e0e0; white-space: pre-wrap; }
-    .notes-section { background: #fff3cd; padding: 20px; border-radius: 8px; margin-top: 30px; }
-    @media print {
-      body { padding: 20px; }
-      .group-section { break-inside: avoid; }
+  };
+
+  // Title
+  doc.setFontSize(20);
+  doc.setTextColor(...darkColor);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Foresight Planning Table', margin, yPos);
+  yPos += 10;
+
+  // Book title
+  doc.setFontSize(14);
+  doc.setTextColor(...primaryColor);
+  doc.text(planningData.book_overview.title, margin, yPos);
+  yPos += 5;
+
+  // Underline
+  doc.setDrawColor(...primaryColor);
+  doc.setLineWidth(0.5);
+  doc.line(margin, yPos, pageWidth - margin, yPos);
+  yPos += 15;
+
+  // Book Overview Section
+  doc.setFontSize(14);
+  doc.setTextColor(...darkColor);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Book Overview', margin, yPos);
+  yPos += 8;
+
+  // Overview table
+  autoTable(doc, {
+    startY: yPos,
+    margin: { left: margin, right: margin },
+    head: [],
+    body: [
+      ['Scope', planningData.book_overview.scope],
+      ['Total Chapters', String(planningData.book_overview.total_chapters)],
+      ['Disciplines', planningData.book_overview.disciplines?.join(', ') || 'N/A'],
+      ['Languages', planningData.book_overview.languages?.join(', ') || 'N/A'],
+    ],
+    columnStyles: {
+      0: { fontStyle: 'bold', cellWidth: 40, fillColor: [245, 245, 245] },
+      1: { cellWidth: contentWidth - 40 },
+    },
+    styles: {
+      fontSize: 10,
+      cellPadding: 4,
+    },
+    theme: 'grid',
+  });
+
+  yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 15;
+
+  // Chapter Groups Section
+  checkPageBreak(20);
+  doc.setFontSize(14);
+  doc.setTextColor(...darkColor);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Chapter Groups (${planningData.chapters?.length || 0})`, margin, yPos);
+  yPos += 10;
+
+  // Each chapter group
+  for (const group of planningData.chapters || []) {
+    checkPageBreak(60);
+
+    // Group header with badge
+    doc.setFillColor(...primaryColor);
+    doc.roundedRect(margin, yPos - 4, 25, 7, 1, 1, 'F');
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text(group.group_id, margin + 2, yPos);
+
+    doc.setFontSize(11);
+    doc.setTextColor(...darkColor);
+    doc.setFont('helvetica', 'bold');
+    const titleText = group.chapter_titles?.join(', ') || '';
+    const titleLines = doc.splitTextToSize(titleText, contentWidth - 30);
+    doc.text(titleLines, margin + 28, yPos);
+    yPos += Math.max(8, titleLines.length * 5) + 3;
+
+    // Chapters
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...grayColor);
+    doc.text('Chapters:', margin, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.text(group.chapter_numbers?.join(', ') || '', margin + 25, yPos);
+    yPos += 6;
+
+    // Summary
+    checkPageBreak(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Summary:', margin, yPos);
+    yPos += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(60, 60, 60);
+    const summaryLines = doc.splitTextToSize(group.content_summary, contentWidth);
+    doc.text(summaryLines, margin, yPos);
+    yPos += summaryLines.length * 5 + 4;
+
+    // Thematic Quadrants
+    if (group.thematic_quadrants && group.thematic_quadrants.length > 0) {
+      checkPageBreak(15);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...grayColor);
+      doc.text('Thematic Quadrants:', margin, yPos);
+      yPos += 5;
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      const quadrantsText = group.thematic_quadrants.join(' • ');
+      const quadrantLines = doc.splitTextToSize(quadrantsText, contentWidth);
+      doc.text(quadrantLines, margin, yPos);
+      yPos += quadrantLines.length * 5 + 4;
     }
-  </style>
-</head>
-<body>
-  <h1>Foresight Planning Table</h1>
-  <h2>${escapeHtml(planningData.book_overview.title)}</h2>
 
-  <table class="overview-table">
-    <tr><td>Scope</td><td>${escapeHtml(planningData.book_overview.scope)}</td></tr>
-    <tr><td>Total Chapters</td><td>${planningData.book_overview.total_chapters}</td></tr>
-    <tr><td>Disciplines</td><td>${escapeHtml(planningData.book_overview.disciplines?.join(', ') || 'N/A')}</td></tr>
-    <tr><td>Languages</td><td>${escapeHtml(planningData.book_overview.languages?.join(', ') || 'N/A')}</td></tr>
-  </table>
+    // Foresight Task
+    checkPageBreak(25);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...grayColor);
+    doc.text('Foresight Task:', margin, yPos);
+    yPos += 5;
 
-  <h2>Chapter Groups (${planningData.chapters?.length || 0})</h2>
+    // Task box
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(40, 40, 40);
+    const taskLines = doc.splitTextToSize(group.foresight_task, contentWidth - 10);
+    const taskHeight = taskLines.length * 5 + 8;
 
-  ${(planningData.chapters || []).map(group => `
-    <div class="group-section">
-      <h3>
-        <span class="badge${group.group_type === 'STANDALONE' ? ' badge-secondary' : ''}">${escapeHtml(group.group_id)}</span>
-        ${escapeHtml(group.chapter_titles?.join(', ') || '')}
-      </h3>
+    checkPageBreak(taskHeight + 5);
+    doc.setFillColor(250, 250, 250);
+    doc.setDrawColor(220, 220, 220);
+    doc.roundedRect(margin, yPos - 2, contentWidth, taskHeight, 2, 2, 'FD');
+    doc.text(taskLines, margin + 5, yPos + 4);
+    yPos += taskHeight + 8;
 
-      <p><span class="label">Chapters:</span> ${group.chapter_numbers?.join(', ') || ''}</p>
-
-      <p><span class="label">Summary:</span><br>${escapeHtml(group.content_summary)}</p>
-
-      ${group.thematic_quadrants && group.thematic_quadrants.length > 0 ? `
-        <p class="label">Thematic Quadrants:</p>
-        <ul class="quadrant-list">
-          ${group.thematic_quadrants.map(q => `<li>${escapeHtml(q)}</li>`).join('')}
-        </ul>
-      ` : ''}
-
-      <p class="label">Foresight Task:</p>
-      <div class="task-content">${escapeHtml(group.foresight_task)}</div>
-    </div>
-  `).join('')}
-
-  ${planningData.implementation_notes ? `
-    <div class="notes-section">
-      <h2>Implementation Notes</h2>
-      <p>${escapeHtml(planningData.implementation_notes)}</p>
-    </div>
-  ` : ''}
-
-  <script>
-    // Auto-trigger print dialog
-    window.onload = function() {
-      setTimeout(function() {
-        window.print();
-      }, 500);
-    };
-  </script>
-</body>
-</html>
-`;
-
-  // Open in new window and trigger print
-  const printWindow = window.open('', '_blank');
-  if (printWindow) {
-    printWindow.document.write(html);
-    printWindow.document.close();
+    // Separator
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 10;
   }
+
+  // Implementation Notes
+  if (planningData.implementation_notes) {
+    checkPageBreak(30);
+
+    doc.setFillColor(255, 243, 205);
+    doc.setDrawColor(255, 230, 150);
+    const notesLines = doc.splitTextToSize(planningData.implementation_notes, contentWidth - 10);
+    const notesHeight = notesLines.length * 5 + 20;
+    doc.roundedRect(margin, yPos, contentWidth, notesHeight, 3, 3, 'FD');
+
+    doc.setFontSize(12);
+    doc.setTextColor(...darkColor);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Implementation Notes', margin + 5, yPos + 8);
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(80, 60, 0);
+    doc.text(notesLines, margin + 5, yPos + 16);
+  }
+
+  // Save the PDF
+  const fileName = sanitizeFileName(planningData.book_overview.title) + '_planning.pdf';
+  doc.save(fileName);
 }
 
-/**
- * Escape HTML special characters
- */
-function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
-}

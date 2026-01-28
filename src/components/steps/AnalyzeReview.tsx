@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAppState, PlanningData, AppendixGroup } from '@/hooks/useAppState';
+import { useAppState, PlanningData, ChapterGroup } from '@/hooks/useAppState';
 import { callGemini, parseJsonResponse, getWorkingModel } from '@/lib/gemini-client';
 import { getAnalysisPrompt } from '@/lib/prompts';
 import { exportPlanningTableToMarkdown } from '@/lib/export';
@@ -219,31 +219,36 @@ Return ONLY the JSON object, no additional text.`;
           ) : (
             <>
               {/* Book Overview */}
-              <div className="bg-muted p-4 rounded-lg space-y-2">
+              <div className="bg-muted p-4 rounded-lg space-y-3">
                 <h3 className="font-semibold flex items-center gap-2">
                   <BookOpen className="w-4 h-4" />
                   {planningData.book_overview.title}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {planningData.book_overview.main_theme}
+                  {planningData.book_overview.scope}
                 </p>
-                <div className="flex gap-2">
-                  <Badge variant="secondary">{planningData.book_overview.field}</Badge>
-                  {planningData.book_overview.estimated_publication_year !== 'Unknown' && (
-                    <Badge variant="outline">
-                      {planningData.book_overview.estimated_publication_year}
-                    </Badge>
-                  )}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">
+                    {planningData.book_overview.total_chapters} Chapters
+                  </Badge>
+                  {planningData.book_overview.disciplines?.map((d: string, i: number) => (
+                    <Badge key={i} variant="outline">{d}</Badge>
+                  ))}
+                  {planningData.book_overview.languages?.map((l: string, i: number) => (
+                    <Badge key={i} variant="outline" className="bg-blue-50">{l}</Badge>
+                  ))}
                 </div>
               </div>
 
               <Separator />
 
-              {/* Recommended Appendices */}
+              {/* Chapter Groups / Appendices */}
               <div>
-                <h3 className="font-semibold mb-3">Recommended Appendices</h3>
+                <h3 className="font-semibold mb-3">
+                  Foresight Planning Table ({planningData.chapters?.length || 0} groups)
+                </h3>
                 <Accordion type="multiple" className="space-y-2">
-                  {planningData.recommended_appendix_groups.map((group: AppendixGroup) => (
+                  {planningData.chapters?.map((group: ChapterGroup) => (
                     <AccordionItem
                       key={group.group_id}
                       value={group.group_id}
@@ -251,50 +256,69 @@ Return ONLY the JSON object, no additional text.`;
                     >
                       <AccordionTrigger className="hover:no-underline">
                         <div className="flex items-center gap-3 text-left">
-                          <Badge variant="default">{group.group_id}</Badge>
-                          <span className="font-medium">{group.theme}</span>
+                          <Badge variant={group.group_type === 'GROUP' ? 'default' : 'secondary'}>
+                            {group.group_id}
+                          </Badge>
+                          <span className="font-medium">
+                            {group.chapter_titles?.join(', ') || `Chapters ${group.chapter_numbers?.join(', ')}`}
+                          </span>
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="space-y-3 pt-2">
                         <div>
                           <p className="text-sm font-medium text-muted-foreground">
-                            Suggested Title
-                          </p>
-                          <p className="text-sm">{group.suggested_title}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-muted-foreground">
                             Chapters Covered
                           </p>
                           <div className="flex gap-1 flex-wrap">
-                            {group.chapters_covered.map((ch: number) => (
+                            {group.chapter_numbers?.map((ch: number, i: number) => (
                               <Badge key={ch} variant="outline" className="text-xs">
-                                Ch. {ch}
+                                Ch. {ch}: {group.chapter_titles?.[i] || ''}
                               </Badge>
                             ))}
                           </div>
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-muted-foreground">Rationale</p>
-                          <p className="text-sm">{group.rationale}</p>
+                          <p className="text-sm font-medium text-muted-foreground">Summary</p>
+                          <p className="text-sm">{group.content_summary}</p>
                         </div>
-                        {group.key_questions && group.key_questions.length > 0 && (
+                        {group.thematic_quadrants && group.thematic_quadrants.length > 0 && (
                           <div>
                             <p className="text-sm font-medium text-muted-foreground">
-                              Key Questions
+                              Thematic Quadrants
                             </p>
-                            <ul className="text-sm list-disc list-inside">
-                              {group.key_questions.map((q: string, i: number) => (
-                                <li key={i}>{q}</li>
+                            <div className="flex gap-1 flex-wrap mt-1">
+                              {group.thematic_quadrants.map((q: string, i: number) => (
+                                <Badge key={i} variant="outline" className="text-xs bg-purple-50">
+                                  {q}
+                                </Badge>
                               ))}
-                            </ul>
+                            </div>
                           </div>
                         )}
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">
+                            Foresight Task
+                          </p>
+                          <p className="text-sm whitespace-pre-wrap">{group.foresight_task}</p>
+                        </div>
                       </AccordionContent>
                     </AccordionItem>
                   ))}
                 </Accordion>
               </div>
+
+              {/* Implementation Notes */}
+              {planningData.implementation_notes && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="font-semibold mb-2">Implementation Notes</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {planningData.implementation_notes}
+                    </p>
+                  </div>
+                </>
+              )}
 
               <Separator />
 

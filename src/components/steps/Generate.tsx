@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useAppState, AppendixGroup } from '@/hooks/useAppState';
+import { useAppState, ChapterGroup } from '@/hooks/useAppState';
 import { callGemini, getWorkingModel } from '@/lib/gemini-client';
 import { getGenerationPrompt } from '@/lib/prompts';
 import { exportToMarkdown, exportToDocx, exportAllAsZip } from '@/lib/export';
@@ -31,15 +31,16 @@ export function Generate() {
     generatedAppendices,
     addGeneratedAppendix,
     wordCountOption,
+    forecastYears,
   } = useAppState();
 
   const [activeTab, setActiveTab] = useState<string>(
-    planningData?.recommended_appendix_groups[0]?.group_id || ''
+    planningData?.chapters?.[0]?.group_id || ''
   );
   const [isGenerating, setIsGenerating] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGenerate = async (group: AppendixGroup) => {
+  const handleGenerate = async (group: ChapterGroup) => {
     if (!apiKey || !bookContent || !planningData) return;
 
     setIsGenerating(group.group_id);
@@ -48,22 +49,32 @@ export function Generate() {
     try {
       const model = getWorkingModel(detectedTier);
 
-      // Build chapter info from planning data
-      const chapterInfo = planningData.chapter_analysis
-        .filter((ch) => group.chapters_covered.includes(ch.chapter_number))
-        .map(
-          (ch) =>
-            `Chapter ${ch.chapter_number}: ${ch.chapter_title}\n` +
-            `Topics: ${ch.main_topics.join(', ')}\n` +
-            `Future Potential: ${ch.future_potential}`
-        )
-        .join('\n\n');
+      // Build chapter info from the group's data
+      const chapterInfo = `Group ID: ${group.group_id}
+Type: ${group.group_type}
+Chapters: ${group.chapter_numbers?.join(', ')}
+Titles: ${group.chapter_titles?.join(', ')}
+
+Summary:
+${group.content_summary}
+
+Thematic Quadrants:
+${group.thematic_quadrants?.join('\n- ') || 'Not specified'}
+
+Foresight Task:
+${group.foresight_task}`;
+
+      // Build a title from the group data
+      const groupTitle = group.chapter_titles?.length === 1
+        ? group.chapter_titles[0]
+        : `Chapters ${group.chapter_numbers?.join(', ')}`;
 
       const prompt = getGenerationPrompt(
-        `${group.group_id}: ${group.suggested_title}`,
+        `${group.group_id}: ${groupTitle}`,
         chapterInfo,
         bookContent,
-        wordCountOption
+        wordCountOption,
+        forecastYears
       );
 
       const response = await callGemini(apiKey, prompt, model);
@@ -78,20 +89,18 @@ export function Generate() {
   const handleDownloadMarkdown = (groupId: string) => {
     const content = generatedAppendices[groupId];
     if (content) {
-      const title = planningData?.recommended_appendix_groups.find(
-        (g) => g.group_id === groupId
-      )?.suggested_title;
-      exportToMarkdown(content, `Appendix_${groupId}_${title || ''}`);
+      const group = planningData?.chapters?.find((g) => g.group_id === groupId);
+      const title = group?.chapter_titles?.join('_') || groupId;
+      exportToMarkdown(content, `Appendix_${groupId}_${title}`);
     }
   };
 
   const handleDownloadDocx = async (groupId: string) => {
     const content = generatedAppendices[groupId];
     if (content) {
-      const title = planningData?.recommended_appendix_groups.find(
-        (g) => g.group_id === groupId
-      )?.suggested_title;
-      await exportToDocx(content, `Appendix_${groupId}_${title || ''}`);
+      const group = planningData?.chapters?.find((g) => g.group_id === groupId);
+      const title = group?.chapter_titles?.join('_') || groupId;
+      await exportToDocx(content, `Appendix_${groupId}_${title}`);
     }
   };
 
@@ -102,7 +111,7 @@ export function Generate() {
   };
 
   const generatedCount = Object.keys(generatedAppendices).length;
-  const totalCount = planningData?.recommended_appendix_groups.length || 0;
+  const totalCount = planningData?.chapters?.length || 0;
 
   if (!planningData) {
     return (
@@ -129,7 +138,7 @@ export function Generate() {
             </Badge>
           </CardTitle>
           <CardDescription>
-            Generate future-oriented appendices based on your planning table
+            Generate future-oriented appendices based on your planning table (targeting {new Date().getFullYear() + forecastYears})
           </CardDescription>
         </CardHeader>
         {generatedCount > 0 && (
@@ -151,7 +160,7 @@ export function Generate() {
       {/* Tabs for each appendix */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="flex flex-wrap h-auto gap-1 bg-muted p-1">
-          {planningData.recommended_appendix_groups.map((group: AppendixGroup) => (
+          {planningData.chapters?.map((group: ChapterGroup) => (
             <TabsTrigger
               key={group.group_id}
               value={group.group_id}
@@ -165,19 +174,33 @@ export function Generate() {
           ))}
         </TabsList>
 
-        {planningData.recommended_appendix_groups.map((group: AppendixGroup) => (
+        {planningData.chapters?.map((group: ChapterGroup) => (
           <TabsContent key={group.group_id} value={group.group_id} className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">{group.suggested_title}</CardTitle>
-                <CardDescription>{group.rationale}</CardDescription>
+                <CardTitle className="text-lg">
+                  {group.chapter_titles?.join(' & ') || `Chapters ${group.chapter_numbers?.join(', ')}`}
+                </CardTitle>
+                <CardDescription>{group.content_summary}</CardDescription>
                 <div className="flex gap-1 flex-wrap mt-2">
-                  {group.chapters_covered.map((ch: number) => (
+                  {group.chapter_numbers?.map((ch: number) => (
                     <Badge key={ch} variant="outline" className="text-xs">
                       Chapter {ch}
                     </Badge>
                   ))}
+                  <Badge variant={group.group_type === 'GROUP' ? 'default' : 'secondary'} className="text-xs">
+                    {group.group_type}
+                  </Badge>
                 </div>
+                {group.thematic_quadrants && group.thematic_quadrants.length > 0 && (
+                  <div className="flex gap-1 flex-wrap mt-2">
+                    {group.thematic_quadrants.map((q: string, i: number) => (
+                      <Badge key={i} variant="outline" className="text-xs bg-purple-50">
+                        {q}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="space-y-4">
                 {!generatedAppendices[group.group_id] ? (

@@ -2,36 +2,29 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode, useEffect, useRef } from 'react';
 
-// Types
+// Types - New structure matching the detailed prompts
 export interface BookOverview {
   title: string;
-  main_theme: string;
-  field: string;
-  estimated_publication_year: string;
+  scope: string;
+  total_chapters: number;
+  disciplines: string[];
+  languages: string[];
 }
 
-export interface ChapterAnalysis {
-  chapter_number: number;
-  chapter_title: string;
-  main_topics: string[];
-  key_concepts: string[];
-  future_potential: string;
-}
-
-export interface AppendixGroup {
+export interface ChapterGroup {
   group_id: string;
-  theme: string;
-  chapters_covered: number[];
-  rationale: string;
-  suggested_title: string;
-  key_questions: string[];
+  group_type: 'GROUP' | 'STANDALONE';
+  chapter_numbers: number[];
+  chapter_titles: string[];
+  content_summary: string;
+  thematic_quadrants: string[];
+  foresight_task: string;
 }
 
 export interface PlanningData {
   book_overview: BookOverview;
-  chapter_analysis: ChapterAnalysis[];
-  recommended_appendix_groups: AppendixGroup[];
-  generation_notes: string;
+  chapters: ChapterGroup[];
+  implementation_notes: string;
 }
 
 export interface ExtractionInfo {

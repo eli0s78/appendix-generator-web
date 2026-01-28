@@ -198,27 +198,44 @@ function sanitizeFileName(name: string): string {
  */
 export function exportPlanningTableToMarkdown(
   planningData: {
-    book_overview: { title: string; main_theme: string; field: string };
-    recommended_appendix_groups: Array<{
+    book_overview: {
+      title: string;
+      scope: string;
+      total_chapters: number;
+      disciplines: string[];
+      languages: string[];
+    };
+    chapters: Array<{
       group_id: string;
-      theme: string;
-      chapters_covered: number[];
-      suggested_title: string;
-      rationale: string;
+      group_type: string;
+      chapter_numbers: number[];
+      chapter_titles: string[];
+      content_summary: string;
+      thematic_quadrants: string[];
+      foresight_task: string;
     }>;
+    implementation_notes: string;
   }
 ): void {
-  let markdown = `# Planning Table: ${planningData.book_overview.title}\n\n`;
-  markdown += `**Theme:** ${planningData.book_overview.main_theme}\n`;
-  markdown += `**Field:** ${planningData.book_overview.field}\n\n`;
-  markdown += `## Recommended Appendices\n\n`;
+  let markdown = `# Foresight Planning Table: ${planningData.book_overview.title}\n\n`;
+  markdown += `**Scope:** ${planningData.book_overview.scope}\n\n`;
+  markdown += `**Total Chapters:** ${planningData.book_overview.total_chapters}\n\n`;
+  markdown += `**Disciplines:** ${planningData.book_overview.disciplines?.join(', ') || 'N/A'}\n\n`;
+  markdown += `**Languages:** ${planningData.book_overview.languages?.join(', ') || 'N/A'}\n\n`;
+  markdown += `## Chapter Groups\n\n`;
 
-  for (const group of planningData.recommended_appendix_groups) {
-    markdown += `### ${group.group_id}: ${group.theme}\n\n`;
-    markdown += `**Suggested Title:** ${group.suggested_title}\n\n`;
-    markdown += `**Chapters Covered:** ${group.chapters_covered.join(', ')}\n\n`;
-    markdown += `**Rationale:** ${group.rationale}\n\n`;
+  for (const group of planningData.chapters || []) {
+    markdown += `### ${group.group_id} (${group.group_type})\n\n`;
+    markdown += `**Chapters:** ${group.chapter_numbers?.join(', ')}\n\n`;
+    markdown += `**Titles:** ${group.chapter_titles?.join(', ')}\n\n`;
+    markdown += `**Summary:** ${group.content_summary}\n\n`;
+    markdown += `**Thematic Quadrants:** ${group.thematic_quadrants?.join(', ')}\n\n`;
+    markdown += `**Foresight Task:**\n${group.foresight_task}\n\n`;
     markdown += '---\n\n';
+  }
+
+  if (planningData.implementation_notes) {
+    markdown += `## Implementation Notes\n\n${planningData.implementation_notes}\n`;
   }
 
   const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });

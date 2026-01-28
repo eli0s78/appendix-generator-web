@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Loader2,
   Brain,
@@ -107,45 +108,71 @@ Return ONLY the JSON object, no additional text.`;
 
   return (
     <div className="space-y-6">
-      {/* Settings Card - only show before analysis */}
+      {/* Settings Accordion - only show before analysis */}
       {!planningData && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Generation Settings</CardTitle>
-            <CardDescription>Configure how appendices will be generated</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="forecast-years">Forecast Years</Label>
-                <Input
-                  id="forecast-years"
-                  type="number"
-                  min={5}
-                  max={30}
-                  value={forecastYears}
-                  onChange={(e) => setForecastYears(parseInt(e.target.value) || 15)}
-                />
-                <p className="text-xs text-muted-foreground">
-                  How many years into the future to forecast (default: 15)
-                </p>
+        <Accordion type="single" collapsible defaultValue="settings">
+          <AccordionItem value="settings" className="border rounded-lg">
+            <AccordionTrigger className="px-4 hover:no-underline">
+              <span className="font-semibold">Generation Settings (Optional)</span>
+            </AccordionTrigger>
+            <AccordionContent className="px-4 pb-4">
+              <p className="text-sm text-muted-foreground mb-4">
+                Customize how appendices are generated:
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Forecast Horizon Slider */}
+                <div className="space-y-4">
+                  <Label className="text-base font-semibold">Forecast Horizon</Label>
+                  <div className="pt-2">
+                    <Slider
+                      value={[forecastYears]}
+                      onValueChange={(value) => setForecastYears(value[0])}
+                      min={5}
+                      max={30}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between mt-1">
+                      <span className="text-sm text-red-500 font-medium">{forecastYears}</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Appendices will analyze trends up to {new Date().getFullYear() + forecastYears}
+                  </p>
+                </div>
+
+                {/* Word Count Radio Buttons */}
+                <div className="space-y-4">
+                  <Label className="text-base font-semibold">Target Word Count</Label>
+                  <RadioGroup
+                    value={wordCountOption}
+                    onValueChange={setWordCountOption}
+                    className="space-y-2"
+                  >
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="1500-2000" id="short" />
+                      <Label htmlFor="short" className="font-normal cursor-pointer">
+                        Short (1500-2000 words)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="2500-3500" id="standard" />
+                      <Label htmlFor="standard" className="font-normal cursor-pointer">
+                        Standard (2500-3500 words)
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-3">
+                      <RadioGroupItem value="4000-5000" id="detailed" />
+                      <Label htmlFor="detailed" className="font-normal cursor-pointer">
+                        Detailed (4000-5000 words)
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="word-count">Word Count per Appendix</Label>
-                <select
-                  id="word-count"
-                  className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                  value={wordCountOption}
-                  onChange={(e) => setWordCountOption(e.target.value)}
-                >
-                  <option value="1500-2000">Short (1500-2000 words)</option>
-                  <option value="2500-3500">Standard (2500-3500 words)</option>
-                  <option value="4000-5000">Long (4000-5000 words)</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       )}
 
       {/* Analysis Card */}

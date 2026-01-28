@@ -5,6 +5,7 @@ import { useAppState, PlanningData, ChapterGroup } from '@/hooks/useAppState';
 import { callGemini, parseJsonResponse, getWorkingModel } from '@/lib/gemini-client';
 import { getAnalysisPrompt } from '@/lib/prompts';
 import { exportPlanningTableToMarkdown, exportPlanningTableToDocx, exportPlanningTableToPdf } from '@/lib/export';
+import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -125,6 +126,18 @@ Return ONLY the JSON object, no additional text.`;
 
   return (
     <div className="space-y-6">
+      {/* Loading Overlays */}
+      <LoadingOverlay
+        isOpen={isAnalyzing}
+        message="Analyzing Book Structure"
+        subMessage="AI is reading and mapping all chapters..."
+      />
+      <LoadingOverlay
+        isOpen={isApplyingChanges}
+        message="Applying Changes"
+        subMessage="AI is updating the planning table..."
+      />
+
       {/* Analysis Card */}
       <Card>
         <CardHeader>

@@ -5,6 +5,7 @@ import { useAppState, ChapterGroup } from '@/hooks/useAppState';
 import { callGemini, getWorkingModel } from '@/lib/gemini-client';
 import { getGenerationPrompt } from '@/lib/prompts';
 import { exportToMarkdown, exportToDocx, exportAllAsZip } from '@/lib/export';
+import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -125,6 +126,13 @@ ${group.foresight_task}`;
 
   return (
     <div className="space-y-6">
+      {/* Loading Overlay */}
+      <LoadingOverlay
+        isOpen={isGenerating !== null}
+        message="Generating Appendix"
+        subMessage={`Creating foresight analysis for ${isGenerating}...`}
+      />
+
       {/* Progress Overview */}
       <Card>
         <CardHeader>

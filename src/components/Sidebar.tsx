@@ -114,8 +114,9 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       const text = await file.text();
       const data = JSON.parse(text);
 
-      if (!data.version || !data.bookContent) {
-        alert('Invalid project file format');
+      // Only require version field - other fields can be null/empty
+      if (!data.version) {
+        alert('Invalid project file format: missing version');
         return;
       }
 

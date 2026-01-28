@@ -2,7 +2,7 @@
  * Export utilities for generating downloadable files
  */
 
-import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle } from 'docx';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
@@ -241,4 +241,302 @@ export function exportPlanningTableToMarkdown(
   const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8' });
   const fileName = sanitizeFileName(planningData.book_overview.title) + '_planning.md';
   saveAs(blob, fileName);
+}
+
+/**
+ * Planning data type for exports
+ */
+interface PlanningDataExport {
+  book_overview: {
+    title: string;
+    scope: string;
+    total_chapters: number;
+    disciplines: string[];
+    languages: string[];
+  };
+  chapters: Array<{
+    group_id: string;
+    group_type: string;
+    chapter_numbers: number[];
+    chapter_titles: string[];
+    content_summary: string;
+    thematic_quadrants: string[];
+    foresight_task: string;
+  }>;
+  implementation_notes: string;
+}
+
+/**
+ * Export planning table as Word document
+ */
+export async function exportPlanningTableToDocx(planningData: PlanningDataExport): Promise<void> {
+  const children: (Paragraph | Table)[] = [];
+
+  // Title
+  children.push(
+    new Paragraph({
+      text: `Foresight Planning Table: ${planningData.book_overview.title}`,
+      heading: HeadingLevel.HEADING_1,
+    })
+  );
+  children.push(new Paragraph({ text: '' }));
+
+  // Book Overview Section
+  children.push(
+    new Paragraph({
+      text: 'Book Overview',
+      heading: HeadingLevel.HEADING_2,
+    })
+  );
+  children.push(new Paragraph({ text: '' }));
+
+  // Overview table
+  const overviewRows = [
+    ['Scope', planningData.book_overview.scope],
+    ['Total Chapters', String(planningData.book_overview.total_chapters)],
+    ['Disciplines', planningData.book_overview.disciplines?.join(', ') || 'N/A'],
+    ['Languages', planningData.book_overview.languages?.join(', ') || 'N/A'],
+  ];
+
+  children.push(
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: overviewRows.map(
+        ([label, value]) =>
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 25, type: WidthType.PERCENTAGE },
+                children: [new Paragraph({ children: [new TextRun({ text: label, bold: true })] })],
+              }),
+              new TableCell({
+                width: { size: 75, type: WidthType.PERCENTAGE },
+                children: [new Paragraph({ text: value })],
+              }),
+            ],
+          })
+      ),
+    })
+  );
+  children.push(new Paragraph({ text: '' }));
+
+  // Chapter Groups Section
+  children.push(
+    new Paragraph({
+      text: 'Chapter Groups',
+      heading: HeadingLevel.HEADING_2,
+    })
+  );
+  children.push(new Paragraph({ text: '' }));
+
+  for (const group of planningData.chapters || []) {
+    // Group heading
+    children.push(
+      new Paragraph({
+        text: `${group.group_id} (${group.group_type})`,
+        heading: HeadingLevel.HEADING_3,
+      })
+    );
+    children.push(new Paragraph({ text: '' }));
+
+    // Chapters covered
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Chapters: ', bold: true }),
+          new TextRun({ text: group.chapter_numbers?.join(', ') || '' }),
+        ],
+      })
+    );
+
+    // Chapter titles
+    children.push(
+      new Paragraph({
+        children: [
+          new TextRun({ text: 'Titles: ', bold: true }),
+          new TextRun({ text: group.chapter_titles?.join(', ') || '' }),
+        ],
+      })
+    );
+    children.push(new Paragraph({ text: '' }));
+
+    // Summary
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: 'Summary', bold: true })],
+      })
+    );
+    children.push(new Paragraph({ text: group.content_summary }));
+    children.push(new Paragraph({ text: '' }));
+
+    // Thematic Quadrants
+    if (group.thematic_quadrants && group.thematic_quadrants.length > 0) {
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: 'Thematic Quadrants', bold: true })],
+        })
+      );
+      for (const quadrant of group.thematic_quadrants) {
+        children.push(
+          new Paragraph({
+            text: quadrant,
+            bullet: { level: 0 },
+          })
+        );
+      }
+      children.push(new Paragraph({ text: '' }));
+    }
+
+    // Foresight Task
+    children.push(
+      new Paragraph({
+        children: [new TextRun({ text: 'Foresight Task', bold: true })],
+      })
+    );
+    children.push(new Paragraph({ text: group.foresight_task }));
+    children.push(new Paragraph({ text: '' }));
+
+    // Separator line (horizontal rule simulation)
+    children.push(
+      new Paragraph({
+        border: {
+          bottom: { color: 'auto', space: 1, style: BorderStyle.SINGLE, size: 6 },
+        },
+      })
+    );
+    children.push(new Paragraph({ text: '' }));
+  }
+
+  // Implementation Notes
+  if (planningData.implementation_notes) {
+    children.push(
+      new Paragraph({
+        text: 'Implementation Notes',
+        heading: HeadingLevel.HEADING_2,
+      })
+    );
+    children.push(new Paragraph({ text: '' }));
+    children.push(new Paragraph({ text: planningData.implementation_notes }));
+  }
+
+  const doc = new Document({
+    title: `Foresight Planning Table: ${planningData.book_overview.title}`,
+    sections: [{ properties: {}, children }],
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const fileName = sanitizeFileName(planningData.book_overview.title) + '_planning.docx';
+  saveAs(blob, fileName);
+}
+
+/**
+ * Export planning table as PDF (opens print dialog)
+ */
+export function exportPlanningTableToPdf(planningData: PlanningDataExport): void {
+  // Create HTML content for PDF
+  const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Foresight Planning Table: ${escapeHtml(planningData.book_overview.title)}</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px;
+    }
+    h1 { color: #1a1a2e; border-bottom: 2px solid #4a4a8a; padding-bottom: 10px; }
+    h2 { color: #2d2d5a; margin-top: 30px; }
+    h3 { color: #4a4a8a; margin-top: 25px; }
+    .overview-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    .overview-table td { padding: 8px 12px; border: 1px solid #ddd; }
+    .overview-table td:first-child { font-weight: bold; background: #f5f5f5; width: 25%; }
+    .group-section { border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin: 20px 0; background: #fafafa; }
+    .badge { display: inline-block; background: #4a4a8a; color: white; padding: 3px 10px; border-radius: 4px; font-size: 0.85em; margin-right: 8px; }
+    .badge-secondary { background: #666; }
+    .quadrant-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+    .quadrant-list li { background: #e8e8f0; padding: 4px 12px; border-radius: 4px; font-size: 0.9em; }
+    .label { font-weight: 600; color: #555; margin-bottom: 5px; }
+    .task-content { background: white; padding: 15px; border-radius: 4px; border: 1px solid #e0e0e0; white-space: pre-wrap; }
+    .notes-section { background: #fff3cd; padding: 20px; border-radius: 8px; margin-top: 30px; }
+    @media print {
+      body { padding: 20px; }
+      .group-section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Foresight Planning Table</h1>
+  <h2>${escapeHtml(planningData.book_overview.title)}</h2>
+
+  <table class="overview-table">
+    <tr><td>Scope</td><td>${escapeHtml(planningData.book_overview.scope)}</td></tr>
+    <tr><td>Total Chapters</td><td>${planningData.book_overview.total_chapters}</td></tr>
+    <tr><td>Disciplines</td><td>${escapeHtml(planningData.book_overview.disciplines?.join(', ') || 'N/A')}</td></tr>
+    <tr><td>Languages</td><td>${escapeHtml(planningData.book_overview.languages?.join(', ') || 'N/A')}</td></tr>
+  </table>
+
+  <h2>Chapter Groups (${planningData.chapters?.length || 0})</h2>
+
+  ${(planningData.chapters || []).map(group => `
+    <div class="group-section">
+      <h3>
+        <span class="badge${group.group_type === 'STANDALONE' ? ' badge-secondary' : ''}">${escapeHtml(group.group_id)}</span>
+        ${escapeHtml(group.chapter_titles?.join(', ') || '')}
+      </h3>
+
+      <p><span class="label">Chapters:</span> ${group.chapter_numbers?.join(', ') || ''}</p>
+
+      <p><span class="label">Summary:</span><br>${escapeHtml(group.content_summary)}</p>
+
+      ${group.thematic_quadrants && group.thematic_quadrants.length > 0 ? `
+        <p class="label">Thematic Quadrants:</p>
+        <ul class="quadrant-list">
+          ${group.thematic_quadrants.map(q => `<li>${escapeHtml(q)}</li>`).join('')}
+        </ul>
+      ` : ''}
+
+      <p class="label">Foresight Task:</p>
+      <div class="task-content">${escapeHtml(group.foresight_task)}</div>
+    </div>
+  `).join('')}
+
+  ${planningData.implementation_notes ? `
+    <div class="notes-section">
+      <h2>Implementation Notes</h2>
+      <p>${escapeHtml(planningData.implementation_notes)}</p>
+    </div>
+  ` : ''}
+
+  <script>
+    // Auto-trigger print dialog
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 500);
+    };
+  </script>
+</body>
+</html>
+`;
+
+  // Open in new window and trigger print
+  const printWindow = window.open('', '_blank');
+  if (printWindow) {
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
+}
+
+/**
+ * Escape HTML special characters
+ */
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }

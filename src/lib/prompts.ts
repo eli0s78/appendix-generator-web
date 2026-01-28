@@ -3,14 +3,22 @@
  * Ported from Python prompts.py - Full detailed version
  */
 
-export function getAnalysisPrompt(bookContent: string): string {
+export function getAnalysisPrompt(bookContent: string, wasTruncated: boolean = false): string {
+  // Only include truncation note if content was actually truncated
+  const truncationNote = wasTruncated
+    ? `
+NOTE: Due to length, some middle content was truncated (marked with "[... CONTENT TRUNCATED ...]").
+The beginning (including Table of Contents) and end are preserved. For chapters with limited content,
+base your analysis on titles, context from surrounding chapters, and the Table of Contents.
+`
+    : '';
+
   return `You are tasked with analyzing a book to prepare a "Forward Thinking - Foresight" framework. Your goal is to create a structured planning document that will guide the subsequent generation of future-oriented appendices for each chapter (or chapter group).
 
 ## THE BOOK CONTENT
 
 The following is the extracted text from the book.
-NOTE: For very long books, some middle content may have been truncated (marked with "[... CONTENT TRUNCATED ...]"). However, the beginning (including Table of Contents) and end of the book are preserved.
-
+${truncationNote}
 <book_content>
 ${bookContent}
 </book_content>
@@ -18,32 +26,24 @@ ${bookContent}
 ## YOUR TASK
 
 ### STEP 1: READ AND MAP THE BOOK - FIND ALL CHAPTERS
-CRITICAL: You must identify ALL chapters in the book, not just the ones with full content.
+CRITICAL: You must identify ALL chapters in the book.
 
 To find all chapters:
 1. FIRST look for a Table of Contents (usually near the beginning) - this lists ALL chapters
 2. Look for chapter headings throughout the text (e.g., "Chapter 1:", "CHAPTER ONE", "1.", etc.)
 3. Look for Part/Section divisions that may contain multiple chapters
 4. Check BOTH the beginning AND end of the text for chapter markers
-5. If content was truncated, infer missing chapters from the Table of Contents or chapter numbering patterns
 
 For each chapter, note:
 - Chapter number and title
 - Approximate page location (if visible)
-- Whether full content is available or only referenced in TOC
 
 ### STEP 2: ANALYZE EACH CHAPTER
-For each chapter (even if content was truncated), determine:
-- Core subject matter and key arguments (from available content or TOC entry)
+For each chapter, determine:
+- Core subject matter and key arguments
 - Main concepts, theories, or frameworks introduced
 - The chapter's role within the book's overall narrative
 - Key conceptual drivers that would anchor a foresight analysis
-
-For chapters with truncated content, base your analysis on:
-- The chapter title
-- Any partial content available
-- Context from surrounding chapters
-- The Table of Contents description (if any)
 
 ### STEP 3: IDENTIFY THEMATIC QUADRANTS
 For each chapter (or group), identify 3-5 thematic quadrants that organize the chapter's subject matter. These quadrants will structure the Futures Radar analysis in the appendix.
@@ -97,12 +97,11 @@ Respond with a JSON object in this exact structure:
 }
 
 IMPORTANT:
-- Include ALL chapters from the book, even if some content was truncated
+- Include ALL chapters from the book
 - The total_chapters count must match the actual number of chapters in the book
 - The foresight_task must be detailed and specific to the chapter content
 - Include specific phenomena, trends, and wild cards relevant to each chapter
 - Specify time horizon (typically 2040-2050) and word count (typically 2000-4000 words)
-- In implementation_notes, mention any chapters that had limited content due to truncation
 - Respond ONLY with the JSON object, no additional text`;
 }
 

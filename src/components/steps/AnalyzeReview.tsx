@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAppState, PlanningData, ChapterGroup } from '@/hooks/useAppState';
 import { callGemini, parseJsonResponse, getWorkingModel } from '@/lib/gemini-client';
 import { getAnalysisPrompt } from '@/lib/prompts';
-import { exportPlanningTableToMarkdown } from '@/lib/export';
+import { exportPlanningTableToMarkdown, exportPlanningTableToDocx, exportPlanningTableToPdf } from '@/lib/export';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +23,9 @@ import {
   RefreshCw,
   ChevronRight,
   Sparkles,
+  FileText,
+  FileType,
+  Printer,
 } from 'lucide-react';
 
 export function AnalyzeReview() {
@@ -30,6 +33,7 @@ export function AnalyzeReview() {
     apiKey,
     detectedTier,
     bookContent,
+    extractionInfo,
     planningData,
     setPlanningData,
     isAnalyzing,
@@ -53,7 +57,8 @@ export function AnalyzeReview() {
 
     try {
       const model = getWorkingModel(detectedTier);
-      const prompt = getAnalysisPrompt(bookContent);
+      const wasTruncated = extractionInfo?.wasTruncated ?? false;
+      const prompt = getAnalysisPrompt(bookContent, wasTruncated);
       const response = await callGemini(apiKey, prompt, model);
       const data = parseJsonResponse(response) as PlanningData;
       setPlanningData(data);
@@ -100,81 +105,26 @@ Return ONLY the JSON object, no additional text.`;
     }
   };
 
-  const handleExportPlanningTable = () => {
+  const handleExportMarkdown = () => {
     if (planningData) {
       exportPlanningTableToMarkdown(planningData);
     }
   };
 
+  const handleExportDocx = async () => {
+    if (planningData) {
+      await exportPlanningTableToDocx(planningData);
+    }
+  };
+
+  const handleExportPdf = () => {
+    if (planningData) {
+      exportPlanningTableToPdf(planningData);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Settings Accordion - only show before analysis */}
-      {!planningData && (
-        <Accordion type="single" collapsible defaultValue="settings">
-          <AccordionItem value="settings" className="border rounded-lg">
-            <AccordionTrigger className="px-4 hover:no-underline">
-              <span className="font-semibold">Generation Settings (Optional)</span>
-            </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
-              <p className="text-sm text-muted-foreground mb-4">
-                Customize how appendices are generated:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Forecast Horizon Slider */}
-                <div className="space-y-4">
-                  <Label className="text-base font-semibold">Forecast Horizon</Label>
-                  <div className="pt-2">
-                    <Slider
-                      value={[forecastYears]}
-                      onValueChange={(value) => setForecastYears(value[0])}
-                      min={5}
-                      max={30}
-                      step={1}
-                      className="w-full"
-                    />
-                    <div className="flex justify-between mt-1">
-                      <span className="text-sm text-red-500 font-medium">{forecastYears}</span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Appendices will analyze trends up to {new Date().getFullYear() + forecastYears}
-                  </p>
-                </div>
-
-                {/* Word Count Radio Buttons */}
-                <div className="space-y-4">
-                  <Label className="text-base font-semibold">Target Word Count</Label>
-                  <RadioGroup
-                    value={wordCountOption}
-                    onValueChange={setWordCountOption}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center space-x-3">
-                      <RadioGroupItem value="1500-2000" id="short" />
-                      <Label htmlFor="short" className="font-normal cursor-pointer">
-                        Short (1500-2000 words)
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <RadioGroupItem value="2500-3500" id="standard" />
-                      <Label htmlFor="standard" className="font-normal cursor-pointer">
-                        Standard (2500-3500 words)
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <RadioGroupItem value="4000-5000" id="detailed" />
-                      <Label htmlFor="detailed" className="font-normal cursor-pointer">
-                        Detailed (4000-5000 words)
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      )}
-
       {/* Analysis Card */}
       <Card>
         <CardHeader>
@@ -350,6 +300,62 @@ Return ONLY the JSON object, no additional text.`;
                 </Button>
               </div>
 
+              <Separator />
+
+              {/* Generation Settings */}
+              <div className="space-y-4">
+                <h3 className="font-semibold">Generation Settings</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Forecast Horizon Slider */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Forecast Horizon</Label>
+                    <div className="pt-2">
+                      <Slider
+                        value={[forecastYears]}
+                        onValueChange={(value) => setForecastYears(value[0])}
+                        min={5}
+                        max={30}
+                        step={1}
+                        className="w-full"
+                      />
+                      <div className="flex justify-between mt-2 text-sm text-muted-foreground">
+                        <span>{forecastYears} years</span>
+                        <span>Target: {new Date().getFullYear() + forecastYears}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Word Count Radio Buttons */}
+                  <div className="space-y-3">
+                    <Label className="text-sm font-medium">Target Word Count</Label>
+                    <RadioGroup
+                      value={wordCountOption}
+                      onValueChange={setWordCountOption}
+                      className="space-y-2"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <RadioGroupItem value="1500-2000" id="short" />
+                        <Label htmlFor="short" className="font-normal cursor-pointer text-sm">
+                          Short (1500-2000 words)
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <RadioGroupItem value="2500-3500" id="standard" />
+                        <Label htmlFor="standard" className="font-normal cursor-pointer text-sm">
+                          Standard (2500-3500 words)
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <RadioGroupItem value="4000-5000" id="detailed" />
+                        <Label htmlFor="detailed" className="font-normal cursor-pointer text-sm">
+                          Detailed (4000-5000 words)
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                </div>
+              </div>
+
               {error && (
                 <Alert variant="destructive">
                   <AlertDescription>{error}</AlertDescription>
@@ -359,19 +365,29 @@ Return ONLY the JSON object, no additional text.`;
               <Separator />
 
               {/* Actions */}
-              <div className="flex gap-2">
-                <Button onClick={handleContinue} className="flex-1" size="lg">
+              <div className="space-y-3">
+                <Button onClick={handleContinue} className="w-full" size="lg">
                   Continue to Generate
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
-                <Button onClick={handleExportPlanningTable} variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-                <Button onClick={handleAnalyze} variant="outline" disabled={isAnalyzing}>
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Re-analyze
-                </Button>
+                <div className="flex gap-2 flex-wrap">
+                  <Button onClick={handleExportMarkdown} variant="outline" size="sm">
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export MD
+                  </Button>
+                  <Button onClick={handleExportDocx} variant="outline" size="sm">
+                    <FileType className="w-4 h-4 mr-2" />
+                    Export DOCX
+                  </Button>
+                  <Button onClick={handleExportPdf} variant="outline" size="sm">
+                    <Printer className="w-4 h-4 mr-2" />
+                    Export PDF
+                  </Button>
+                  <Button onClick={handleAnalyze} variant="outline" size="sm" disabled={isAnalyzing}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Re-analyze
+                  </Button>
+                </div>
               </div>
             </>
           )}

@@ -35,52 +35,122 @@ function createDocxFromMarkdown(markdown: string, title: string): Document {
   const children: Paragraph[] = [];
 
   for (const line of lines) {
+    // Heading 1
     if (line.startsWith('# ')) {
       children.push(
         new Paragraph({
-          text: line.slice(2),
+          children: parseInlineFormatting(line.slice(2)),
           heading: HeadingLevel.HEADING_1,
         })
       );
-    } else if (line.startsWith('## ')) {
+    }
+    // Heading 2
+    else if (line.startsWith('## ')) {
       children.push(
         new Paragraph({
-          text: line.slice(3),
+          children: parseInlineFormatting(line.slice(3)),
           heading: HeadingLevel.HEADING_2,
         })
       );
-    } else if (line.startsWith('### ')) {
+    }
+    // Heading 3
+    else if (line.startsWith('### ')) {
       children.push(
         new Paragraph({
-          text: line.slice(4),
+          children: parseInlineFormatting(line.slice(4)),
           heading: HeadingLevel.HEADING_3,
         })
       );
-    } else if (line.startsWith('#### ')) {
+    }
+    // Heading 4
+    else if (line.startsWith('#### ')) {
       children.push(
         new Paragraph({
-          text: line.slice(5),
+          children: parseInlineFormatting(line.slice(5)),
           heading: HeadingLevel.HEADING_4,
         })
       );
-    } else if (line.startsWith('- ') || line.startsWith('* ')) {
+    }
+    // Heading 5
+    else if (line.startsWith('##### ')) {
       children.push(
         new Paragraph({
-          text: line.slice(2),
+          children: parseInlineFormatting(line.slice(6)),
+          heading: HeadingLevel.HEADING_5,
+        })
+      );
+    }
+    // Heading 6
+    else if (line.startsWith('###### ')) {
+      children.push(
+        new Paragraph({
+          children: parseInlineFormatting(line.slice(7)),
+          heading: HeadingLevel.HEADING_6,
+        })
+      );
+    }
+    // Nested bullet list (indented with spaces or tabs)
+    else if (line.match(/^(\s{2,}|\t+)[-*] /)) {
+      const match = line.match(/^(\s+)[-*] (.*)$/);
+      if (match) {
+        const indent = match[1].replace(/\t/g, '  ').length;
+        const level = Math.min(Math.floor(indent / 2), 4); // Max 5 levels (0-4)
+        children.push(
+          new Paragraph({
+            children: parseInlineFormatting(match[2]),
+            bullet: { level },
+          })
+        );
+      }
+    }
+    // Top-level bullet list
+    else if (line.startsWith('- ') || line.startsWith('* ')) {
+      children.push(
+        new Paragraph({
+          children: parseInlineFormatting(line.slice(2)),
           bullet: { level: 0 },
         })
       );
-    } else if (line.match(/^\d+\. /)) {
+    }
+    // Nested numbered list (indented with spaces or tabs)
+    else if (line.match(/^(\s{2,}|\t+)\d+\. /)) {
+      const match = line.match(/^(\s+)\d+\. (.*)$/);
+      if (match) {
+        const indent = match[1].replace(/\t/g, '  ').length;
+        const level = Math.min(Math.floor(indent / 2), 4);
+        children.push(
+          new Paragraph({
+            children: parseInlineFormatting(match[2]),
+            numbering: { reference: 'default-numbering', level },
+          })
+        );
+      }
+    }
+    // Top-level numbered list
+    else if (line.match(/^\d+\. /)) {
       children.push(
         new Paragraph({
-          text: line.replace(/^\d+\. /, ''),
+          children: parseInlineFormatting(line.replace(/^\d+\. /, '')),
           numbering: { reference: 'default-numbering', level: 0 },
         })
       );
-    } else if (line.trim() === '') {
+    }
+    // Horizontal rule
+    else if (line.match(/^[-*_]{3,}\s*$/)) {
+      children.push(
+        new Paragraph({
+          border: {
+            bottom: { color: 'auto', space: 1, style: BorderStyle.SINGLE, size: 6 },
+          },
+        })
+      );
+    }
+    // Empty line
+    else if (line.trim() === '') {
       children.push(new Paragraph({ text: '' }));
-    } else {
-      // Handle bold and italic
+    }
+    // Regular paragraph with inline formatting
+    else {
       const runs: TextRun[] = parseInlineFormatting(line);
       children.push(new Paragraph({ children: runs }));
     }
@@ -99,12 +169,11 @@ function createDocxFromMarkdown(markdown: string, title: string): Document {
         {
           reference: 'default-numbering',
           levels: [
-            {
-              level: 0,
-              format: 'decimal',
-              text: '%1.',
-              alignment: 'start',
-            },
+            { level: 0, format: 'decimal', text: '%1.', alignment: 'start' },
+            { level: 1, format: 'lowerLetter', text: '%2.', alignment: 'start' },
+            { level: 2, format: 'lowerRoman', text: '%3.', alignment: 'start' },
+            { level: 3, format: 'decimal', text: '%4.', alignment: 'start' },
+            { level: 4, format: 'lowerLetter', text: '%5.', alignment: 'start' },
           ],
         },
       ],
@@ -113,44 +182,109 @@ function createDocxFromMarkdown(markdown: string, title: string): Document {
 }
 
 /**
- * Parse inline markdown formatting (bold, italic)
+ * Parse inline markdown formatting (bold, italic, underline, superscript, subscript)
+ * Supports nested formatting like ***bold and italic***
  */
-function parseInlineFormatting(text: string): TextRun[] {
+function parseInlineFormatting(text: string, inheritedStyles: { bold?: boolean; italics?: boolean; underline?: object; superScript?: boolean; subScript?: boolean } = {}): TextRun[] {
   const runs: TextRun[] = [];
   let remaining = text;
 
   while (remaining.length > 0) {
+    // Check for bold+italic (***text*** or ___text___)
+    const boldItalicMatch = remaining.match(/^\*\*\*(.+?)\*\*\*|^___(.+?)___/);
+    if (boldItalicMatch) {
+      const content = boldItalicMatch[1] || boldItalicMatch[2];
+      const innerRuns = parseInlineFormatting(content, { ...inheritedStyles, bold: true, italics: true });
+      runs.push(...innerRuns);
+      remaining = remaining.slice(boldItalicMatch[0].length);
+      continue;
+    }
+
     // Check for bold (**text** or __text__)
     const boldMatch = remaining.match(/^\*\*(.+?)\*\*|^__(.+?)__/);
     if (boldMatch) {
-      runs.push(new TextRun({ text: boldMatch[1] || boldMatch[2], bold: true }));
+      const content = boldMatch[1] || boldMatch[2];
+      const innerRuns = parseInlineFormatting(content, { ...inheritedStyles, bold: true });
+      runs.push(...innerRuns);
       remaining = remaining.slice(boldMatch[0].length);
       continue;
     }
 
-    // Check for italic (*text* or _text_)
-    const italicMatch = remaining.match(/^\*([^*]+?)\*|^_([^_]+?)_/);
-    if (italicMatch) {
-      runs.push(new TextRun({ text: italicMatch[1] || italicMatch[2], italics: true }));
-      remaining = remaining.slice(italicMatch[0].length);
+    // Check for italic (*text* or _text_) - improved regex that doesn't conflict with bold
+    // Match single asterisk/underscore that's not followed by another
+    const italicAsteriskMatch = remaining.match(/^\*(?!\*)([^*]+?)\*(?!\*)/);
+    if (italicAsteriskMatch) {
+      const innerRuns = parseInlineFormatting(italicAsteriskMatch[1], { ...inheritedStyles, italics: true });
+      runs.push(...innerRuns);
+      remaining = remaining.slice(italicAsteriskMatch[0].length);
       continue;
     }
 
-    // Find the next formatting marker
-    const nextMarker = remaining.search(/\*|_/);
+    const italicUnderscoreMatch = remaining.match(/^_(?!_)([^_]+?)_(?!_)/);
+    if (italicUnderscoreMatch) {
+      const innerRuns = parseInlineFormatting(italicUnderscoreMatch[1], { ...inheritedStyles, italics: true });
+      runs.push(...innerRuns);
+      remaining = remaining.slice(italicUnderscoreMatch[0].length);
+      continue;
+    }
+
+    // Check for underline (<u>text</u>)
+    const underlineMatch = remaining.match(/^<u>(.+?)<\/u>/i);
+    if (underlineMatch) {
+      const innerRuns = parseInlineFormatting(underlineMatch[1], { ...inheritedStyles, underline: {} });
+      runs.push(...innerRuns);
+      remaining = remaining.slice(underlineMatch[0].length);
+      continue;
+    }
+
+    // Check for superscript (<sup>text</sup> or ^text^)
+    const supHtmlMatch = remaining.match(/^<sup>(.+?)<\/sup>/i);
+    if (supHtmlMatch) {
+      runs.push(new TextRun({ text: supHtmlMatch[1], ...inheritedStyles, superScript: true }));
+      remaining = remaining.slice(supHtmlMatch[0].length);
+      continue;
+    }
+
+    const supCaretMatch = remaining.match(/^\^([^^]+?)\^/);
+    if (supCaretMatch) {
+      runs.push(new TextRun({ text: supCaretMatch[1], ...inheritedStyles, superScript: true }));
+      remaining = remaining.slice(supCaretMatch[0].length);
+      continue;
+    }
+
+    // Check for subscript (<sub>text</sub> or ~text~ but not ~~strikethrough~~)
+    const subHtmlMatch = remaining.match(/^<sub>(.+?)<\/sub>/i);
+    if (subHtmlMatch) {
+      runs.push(new TextRun({ text: subHtmlMatch[1], ...inheritedStyles, subScript: true }));
+      remaining = remaining.slice(subHtmlMatch[0].length);
+      continue;
+    }
+
+    const subTildeMatch = remaining.match(/^~(?!~)([^~]+?)~(?!~)/);
+    if (subTildeMatch) {
+      runs.push(new TextRun({ text: subTildeMatch[1], ...inheritedStyles, subScript: true }));
+      remaining = remaining.slice(subTildeMatch[0].length);
+      continue;
+    }
+
+    // Find the next potential formatting marker
+    const nextMarker = remaining.search(/\*|_|<[su]|[\^~]/i);
     if (nextMarker === -1) {
-      runs.push(new TextRun({ text: remaining }));
+      // No more markers, add rest as plain text with inherited styles
+      runs.push(new TextRun({ text: remaining, ...inheritedStyles }));
       break;
     } else if (nextMarker === 0) {
-      runs.push(new TextRun({ text: remaining[0] }));
+      // Marker at start but didn't match any pattern - treat as literal character
+      runs.push(new TextRun({ text: remaining[0], ...inheritedStyles }));
       remaining = remaining.slice(1);
     } else {
-      runs.push(new TextRun({ text: remaining.slice(0, nextMarker) }));
+      // Add text before the marker as plain text with inherited styles
+      runs.push(new TextRun({ text: remaining.slice(0, nextMarker), ...inheritedStyles }));
       remaining = remaining.slice(nextMarker);
     }
   }
 
-  return runs.length > 0 ? runs : [new TextRun({ text })];
+  return runs.length > 0 ? runs : [new TextRun({ text, ...inheritedStyles })];
 }
 
 /**
@@ -618,5 +752,274 @@ export function exportPlanningTableToPdf(planningData: PlanningDataExport): void
   // Save the PDF
   const fileName = sanitizeFileName(planningData.book_overview.title) + '_planning.pdf';
   doc.save(fileName);
+}
+
+/**
+ * Export appendix content as PDF (direct download)
+ */
+export function exportAppendixToPdf(content: string, title: string): void {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  const contentWidth = pageWidth - margin * 2;
+  let yPos = 25;
+
+  // Colors
+  const primaryColor: [number, number, number] = [74, 74, 138];
+  const darkColor: [number, number, number] = [26, 26, 46];
+  const grayColor: [number, number, number] = [100, 100, 100];
+
+  // Helper to check page break
+  const checkPageBreak = (neededHeight: number) => {
+    if (yPos + neededHeight > pageHeight - 20) {
+      doc.addPage();
+      yPos = 25;
+    }
+  };
+
+  // Parse markdown and render
+  const lines = content.split('\n');
+  let inTable = false;
+  let tableRows: string[][] = [];
+  let tableHeaders: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmedLine = line.trim();
+
+    // Skip empty lines but add spacing
+    if (trimmedLine === '') {
+      if (inTable && tableRows.length > 0) {
+        // End of table - render it
+        checkPageBreak(40);
+        renderPdfTable(doc, tableHeaders, tableRows, margin, yPos, contentWidth);
+        yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+        inTable = false;
+        tableRows = [];
+        tableHeaders = [];
+      }
+      yPos += 4;
+      continue;
+    }
+
+    // Table row detection
+    if (trimmedLine.startsWith('|') && trimmedLine.endsWith('|')) {
+      const cells = trimmedLine.split('|').filter(c => c.trim() !== '');
+
+      // Check if separator row
+      if (cells.every(c => /^[-:]+$/.test(c.trim()))) {
+        continue; // Skip separator
+      }
+
+      if (!inTable) {
+        inTable = true;
+        tableHeaders = cells.map(c => stripMarkdownFormatting(c.trim()));
+      } else {
+        tableRows.push(cells.map(c => stripMarkdownFormatting(c.trim())));
+      }
+      continue;
+    }
+
+    // If we were in a table but hit non-table content, render the table
+    if (inTable && tableRows.length > 0) {
+      checkPageBreak(40);
+      renderPdfTable(doc, tableHeaders, tableRows, margin, yPos, contentWidth);
+      yPos = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+      inTable = false;
+      tableRows = [];
+      tableHeaders = [];
+    }
+
+    // Heading 1
+    if (trimmedLine.startsWith('# ')) {
+      checkPageBreak(20);
+      doc.setFontSize(18);
+      doc.setTextColor(...darkColor);
+      doc.setFont('helvetica', 'bold');
+      const text = stripMarkdownFormatting(trimmedLine.slice(2));
+      const textLines = doc.splitTextToSize(text, contentWidth);
+      doc.text(textLines, margin, yPos);
+      yPos += textLines.length * 8 + 6;
+    }
+    // Heading 2
+    else if (trimmedLine.startsWith('## ')) {
+      checkPageBreak(16);
+      doc.setFontSize(14);
+      doc.setTextColor(...primaryColor);
+      doc.setFont('helvetica', 'bold');
+      const text = stripMarkdownFormatting(trimmedLine.slice(3));
+      const textLines = doc.splitTextToSize(text, contentWidth);
+      doc.text(textLines, margin, yPos);
+      yPos += textLines.length * 6 + 5;
+    }
+    // Heading 3
+    else if (trimmedLine.startsWith('### ')) {
+      checkPageBreak(14);
+      doc.setFontSize(12);
+      doc.setTextColor(...darkColor);
+      doc.setFont('helvetica', 'bold');
+      const text = stripMarkdownFormatting(trimmedLine.slice(4));
+      const textLines = doc.splitTextToSize(text, contentWidth);
+      doc.text(textLines, margin, yPos);
+      yPos += textLines.length * 5 + 4;
+    }
+    // Heading 4-6
+    else if (trimmedLine.match(/^#{4,6} /)) {
+      checkPageBreak(12);
+      doc.setFontSize(11);
+      doc.setTextColor(...grayColor);
+      doc.setFont('helvetica', 'bold');
+      const text = stripMarkdownFormatting(trimmedLine.replace(/^#{4,6} /, ''));
+      const textLines = doc.splitTextToSize(text, contentWidth);
+      doc.text(textLines, margin, yPos);
+      yPos += textLines.length * 5 + 3;
+    }
+    // Nested bullet (starts with spaces/tab then - or *)
+    else if (line.match(/^(\s{2,}|\t)[-*] /)) {
+      checkPageBreak(8);
+      doc.setFontSize(10);
+      doc.setTextColor(80, 80, 80);
+      doc.setFont('helvetica', 'normal');
+      const match = line.match(/^(\s+)[-*] (.*)$/);
+      if (match) {
+        const indent = Math.min(Math.floor(match[1].replace(/\t/g, '  ').length / 2), 3) * 6;
+        const text = stripMarkdownFormatting(match[2]);
+        const textLines = doc.splitTextToSize(text, contentWidth - 10 - indent);
+        doc.text('◦', margin + indent, yPos);
+        doc.text(textLines, margin + indent + 6, yPos);
+        yPos += textLines.length * 5 + 2;
+      }
+    }
+    // Top-level bullet list
+    else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+      checkPageBreak(8);
+      doc.setFontSize(10);
+      doc.setTextColor(60, 60, 60);
+      doc.setFont('helvetica', 'normal');
+      const text = stripMarkdownFormatting(trimmedLine.slice(2));
+      const textLines = doc.splitTextToSize(text, contentWidth - 10);
+      doc.text('•', margin, yPos);
+      doc.text(textLines, margin + 8, yPos);
+      yPos += textLines.length * 5 + 2;
+    }
+    // Numbered list
+    else if (trimmedLine.match(/^\d+\. /)) {
+      checkPageBreak(8);
+      doc.setFontSize(10);
+      doc.setTextColor(60, 60, 60);
+      doc.setFont('helvetica', 'normal');
+      const match = trimmedLine.match(/^(\d+)\. (.*)$/);
+      if (match) {
+        const num = match[1];
+        const text = stripMarkdownFormatting(match[2]);
+        const textLines = doc.splitTextToSize(text, contentWidth - 12);
+        doc.text(`${num}.`, margin, yPos);
+        doc.text(textLines, margin + 10, yPos);
+        yPos += textLines.length * 5 + 2;
+      }
+    }
+    // Horizontal rule
+    else if (trimmedLine.match(/^[-*_]{3,}$/)) {
+      checkPageBreak(10);
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 8;
+    }
+    // Blockquote
+    else if (trimmedLine.startsWith('> ')) {
+      checkPageBreak(12);
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.setFont('helvetica', 'italic');
+      const text = stripMarkdownFormatting(trimmedLine.slice(2));
+      const textLines = doc.splitTextToSize(text, contentWidth - 15);
+      // Draw left border
+      doc.setDrawColor(...primaryColor);
+      doc.setLineWidth(2);
+      doc.line(margin, yPos - 2, margin, yPos + textLines.length * 5);
+      doc.text(textLines, margin + 8, yPos);
+      yPos += textLines.length * 5 + 4;
+    }
+    // Regular paragraph
+    else {
+      checkPageBreak(10);
+      doc.setFontSize(10);
+      doc.setTextColor(40, 40, 40);
+      doc.setFont('helvetica', 'normal');
+      const text = stripMarkdownFormatting(trimmedLine);
+      const textLines = doc.splitTextToSize(text, contentWidth);
+      doc.text(textLines, margin, yPos);
+      yPos += textLines.length * 5 + 3;
+    }
+  }
+
+  // Render any remaining table
+  if (inTable && tableRows.length > 0) {
+    checkPageBreak(40);
+    renderPdfTable(doc, tableHeaders, tableRows, margin, yPos, contentWidth);
+  }
+
+  // Save the PDF
+  const fileName = sanitizeFileName(title) + '.pdf';
+  doc.save(fileName);
+}
+
+/**
+ * Helper to render a table using jspdf-autotable
+ */
+function renderPdfTable(
+  doc: jsPDF,
+  headers: string[],
+  rows: string[][],
+  margin: number,
+  yPos: number,
+  contentWidth: number
+): void {
+  autoTable(doc, {
+    startY: yPos,
+    margin: { left: margin, right: margin },
+    head: headers.length > 0 ? [headers] : undefined,
+    body: rows,
+    headStyles: {
+      fillColor: [74, 74, 138],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 9,
+    },
+    bodyStyles: {
+      fontSize: 9,
+      cellPadding: 3,
+    },
+    alternateRowStyles: {
+      fillColor: [245, 245, 250],
+    },
+    styles: {
+      overflow: 'linebreak',
+      cellWidth: 'wrap',
+    },
+    theme: 'grid',
+  });
+}
+
+/**
+ * Strip markdown formatting for plain text (used in PDF)
+ */
+function stripMarkdownFormatting(text: string): string {
+  return text
+    .replace(/\*\*\*(.+?)\*\*\*/g, '$1')  // Bold+Italic ***text***
+    .replace(/___(.+?)___/g, '$1')         // Bold+Italic ___text___
+    .replace(/\*\*(.+?)\*\*/g, '$1')       // Bold **text**
+    .replace(/__(.+?)__/g, '$1')           // Bold __text__
+    .replace(/\*(.+?)\*/g, '$1')           // Italic *text*
+    .replace(/_(.+?)_/g, '$1')             // Italic _text_
+    .replace(/<u>(.+?)<\/u>/gi, '$1')      // Underline
+    .replace(/<sup>(.+?)<\/sup>/gi, '$1')  // Superscript HTML
+    .replace(/<sub>(.+?)<\/sub>/gi, '$1')  // Subscript HTML
+    .replace(/\^(.+?)\^/g, '$1')           // Superscript ^text^
+    .replace(/~(.+?)~/g, '$1')             // Subscript ~text~
+    .replace(/`(.+?)`/g, '$1')             // Inline code
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1');   // Links [text](url)
 }
 

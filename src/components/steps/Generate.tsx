@@ -4,7 +4,8 @@ import { useState, useRef } from 'react';
 import { useAppState, ChapterGroup } from '@/hooks/useAppState';
 import { callGemini, getWorkingModel } from '@/lib/gemini-client';
 import { getGenerationPrompt } from '@/lib/prompts';
-import { exportToMarkdown, exportToDocx, exportAllAsZip } from '@/lib/export';
+import { exportToMarkdown, exportToDocx, exportAppendixToPdf, exportAllAsZip } from '@/lib/export';
+import { MarkdownPreview } from '@/components/MarkdownPreview';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,7 @@ import {
   Download,
   FileText,
   FileType,
+  Printer,
   Archive,
   CheckCircle2,
   RefreshCw,
@@ -120,6 +122,15 @@ ${group.foresight_task}`;
       const group = planningData?.chapters?.find((g) => g.group_id === groupId);
       const title = group?.chapter_titles?.join('_') || groupId;
       await exportToDocx(content, `Appendix_${groupId}_${title}`);
+    }
+  };
+
+  const handleDownloadPdf = (groupId: string) => {
+    const content = generatedAppendices[groupId];
+    if (content) {
+      const group = planningData?.chapters?.find((g) => g.group_id === groupId);
+      const title = group?.chapter_titles?.join('_') || groupId;
+      exportAppendixToPdf(content, `Appendix_${groupId}_${title}`);
     }
   };
 
@@ -251,11 +262,9 @@ ${group.foresight_task}`;
                   </Button>
                 ) : (
                   <>
-                    {/* Generated Content Preview */}
-                    <div className="bg-muted rounded-lg p-4 max-h-96 overflow-y-auto">
-                      <pre className="whitespace-pre-wrap text-sm font-mono">
-                        {generatedAppendices[group.group_id]}
-                      </pre>
+                    {/* Generated Content Preview - Rich Text */}
+                    <div className="bg-background border border-border rounded-lg p-6 max-h-[600px] overflow-y-auto">
+                      <MarkdownPreview content={generatedAppendices[group.group_id]} />
                     </div>
 
                     <Separator />
@@ -277,6 +286,14 @@ ${group.foresight_task}`;
                       >
                         <FileType className="w-4 h-4 mr-2" />
                         Download Word
+                      </Button>
+                      <Button
+                        onClick={() => handleDownloadPdf(group.group_id)}
+                        variant="outline"
+                        size="sm"
+                      >
+                        <Printer className="w-4 h-4 mr-2" />
+                        Download PDF
                       </Button>
                       <Button
                         onClick={() => handleGenerate(group)}

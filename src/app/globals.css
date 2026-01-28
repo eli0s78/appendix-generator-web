@@ -123,3 +123,58 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Markdown Preview Styles */
+.markdown-preview {
+  /* Nested lists */
+  & ul ul,
+  & ol ol,
+  & ul ol,
+  & ol ul {
+    margin-left: 1.5rem;
+    margin-top: 0.25rem;
+    margin-bottom: 0.25rem;
+  }
+
+  /* Third level nesting */
+  & ul ul ul,
+  & ol ol ol {
+    margin-left: 1.25rem;
+  }
+
+  /* KaTeX math styling */
+  & .katex-display {
+    margin: 1rem 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  & .katex {
+    font-size: 1.1em;
+  }
+
+  /* Table hover effects */
+  & table tbody tr:hover {
+    background-color: var(--muted);
+  }
+
+  /* Blockquote nested paragraphs */
+  & blockquote p {
+    margin: 0.5rem 0;
+  }
+
+  /* Code block scrollbar */
+  & pre::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  & pre::-webkit-scrollbar-thumb {
+    background-color: var(--muted-foreground);
+    border-radius: 3px;
+  }
+
+  /* Horizontal rule spacing */
+  & hr {
+    margin: 1.5rem 0;
+  }
+}
